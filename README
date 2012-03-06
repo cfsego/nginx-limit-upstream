@@ -1,0 +1,58 @@
+Limit upstream module for nginx
+
+=OVERVIEW===============================================================
+
+Maybe you will face such problem: a upstream server is able to achieve high QPS within a relatively low load, for example, mysql, 8000-9000QPS when the connections within 60. Moreover, there is no usable module fit for the case to limit the load to a upstream server and keep the server running fast, so far. The limit_request module can not do the thing, and limit_zone module is too violent.
+
+This is a try, the module will limit the number of connections to a upstream server. With it, we could control the upstream load. When the number of upstream connections comes up to the set threshold, more request from clients will suspend and wait until a upstream request finishes. You can specify the length of waiting queue, and the waiting timeout too.
+
+The strategy for the module is 'suspend util someone wake you up'. Each worker do the same thing independently, however, with a global counter. A special case is allow to go upstream even when the limit is reached: there is no request go upstream and not finish for that time. So the maximum number of established connections to a upstream server is ('limit' + 'worker_processes').
+
+=MANUAL=================================================================
+
+Example:
+
+http {
+    server {
+        location           =/fc {
+            proxy_pass      http://pool;
+        }
+    }
+
+    limit_upstream_zone test 10m;
+
+    upstream pool {
+        server 10.232.36.98:3111;
+        ...
+
+        limit_upstream_conn limit=260 zone=test backlog=10000 timeout=180s;
+    }
+}
+
+syntax:  limit_upstream_zone zone_name size;
+default: -
+context: http
+
+Define a share memory pool for the module.
+
+syntax:  limit_upstream_conn zone=zone_name limit=limit [backlog=length] [timeout=timeout | nodelay];
+default: -
+context: upstream
+
+Set a zone, the maximum allowed for each server of the upstream, the backlog length, and the timeout for each suspended request. The default for 'backlog' is 1000, and it for 'timeout' is the same.
+
+When backlog for a server is full, it may use other server, Otherwise, it wait in the queue. The timeout will cause 408 return status code.
+
+=INSTALL===============================================================
+
+patch -p2 < nginx.patch
+
+./configure --add-module=/path/to/module
+make
+make install
+
+=BUGS==================================================================
+
+Ok, there is no bug found for now, however, some more features are needed:
+1. a request finished in any worker will trigger sending notify the other workers. So, the less wait, the faster whole system finishes.
+2. define log level
