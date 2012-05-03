@@ -51,6 +51,10 @@ patch -p2 < nginx.patch
 make
 make install
 
+=PATCH=================================================================
+
+The patch is based on nginx 1.0.11 and I did not test it on the other versions
+
 =BUGS==================================================================
 
 Ok, there is no bug found for now, however, some more features are needed:
