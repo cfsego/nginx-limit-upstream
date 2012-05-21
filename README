@@ -40,13 +40,15 @@ syntax:  limit_upstream_conn zone=zone_name limit=limit [backlog=length] [timeou
 default: -
 context: upstream
 
+Set a zone, the maximum allowed for each server of the upstream, the backlog length, and the timeout for each suspended request. The default for 'backlog' is 1000, and it for 'timeout' is the same.
+
+When backlog for a server is full, it may use other server, Otherwise, it wait in the queue. The timeout will cause 408 return status code.
+
 syntax:  limit_upstream_log_level [ error | warn | notice | info ];
 default: limit_upstream_log_level notice;
 context: http, upstram
 
-Set a zone, the maximum allowed for each server of the upstream, the backlog length, and the timeout for each suspended request. The default for 'backlog' is 1000, and it for 'timeout' is the same.
-
-When backlog for a server is full, it may use other server, Otherwise, it wait in the queue. The timeout will cause 408 return status code.
+define the log level of ordinary logs for the module. However it is absolutely "WARN" for timeout or direct dropoff.
 
 =INSTALL===============================================================
 
@@ -58,7 +60,8 @@ make install
 
 =PATCH=================================================================
 
-The patch is based on nginx 1.0.11 and I did not test it on the other versions
+The patch is based on nginx 1.0.11, and it is compatible with nginx 1.2.0.
+However, I did not test it on the other versions:)
 
 =BUGS==================================================================
 
