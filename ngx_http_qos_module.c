@@ -597,11 +597,12 @@ static ngx_int_t
 ngx_http_limit_upstream_init(ngx_conf_t *cf)
 {
     ngx_uint_t                       i;
-    ngx_http_limit_upstream_conf_t  *lucf;
+    ngx_http_limit_upstream_conf_t  *lucf, *mlucf;
     ngx_http_upstream_srv_conf_t   **uscfp;
     ngx_http_upstream_main_conf_t   *umcf;
 
     umcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_upstream_module);
+    mlucf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_limit_upstream_module);
     uscfp = umcf->upstreams.elts;
 
     ngx_rbtree_init(&ngx_http_limit_upstream_loc_rbtree,
@@ -624,6 +625,12 @@ ngx_http_limit_upstream_init(ngx_conf_t *cf)
 
                 if (lucf->timeout == NGX_CONF_UNSET_MSEC) {
                     lucf->timeout = 1000;
+                }
+
+                if (ngx_http_limit_upstream_merge_srv_conf(cf, mlucf, lucf)
+                    != NGX_CONF_OK)
+                {
+                    return NGX_ERROR;
                 }
             }
         }

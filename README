@@ -26,6 +26,7 @@ http {
         ...
 
         limit_upstream_conn limit=260 zone=test backlog=10000 timeout=180s;
+        limit_upstream_log_level error;
     }
 }
 
@@ -38,6 +39,10 @@ Define a share memory pool for the module.
 syntax:  limit_upstream_conn zone=zone_name limit=limit [backlog=length] [timeout=timeout | nodelay];
 default: -
 context: upstream
+
+syntax:  limit_upstream_log_level [ error | warn | notice | info ];
+default: limit_upstream_log_level notice;
+context: http, upstram
 
 Set a zone, the maximum allowed for each server of the upstream, the backlog length, and the timeout for each suspended request. The default for 'backlog' is 1000, and it for 'timeout' is the same.
 
@@ -59,4 +64,3 @@ The patch is based on nginx 1.0.11 and I did not test it on the other versions
 
 Ok, there is no bug found for now, however, some more features are needed:
 1. a request finished in any worker will trigger sending notify the other workers. So, the less wait, the faster whole system finishes.
-2. define log level
