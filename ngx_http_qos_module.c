@@ -17,7 +17,10 @@ typedef struct {
     ngx_uint_t                       backlog;
     ngx_msec_t                       timeout;
     ngx_shm_zone_t                  *shm_zone;
+
     ngx_http_upstream_init_peer_pt   init;
+
+    ngx_uint_t                       log_level;
 } ngx_http_limit_upstream_conf_t;
 
 
@@ -52,11 +55,12 @@ typedef struct {
 typedef struct {
     ngx_http_request_t              *r;
     ngx_http_limit_upstream_conf_t  *lucf;
-    ngx_event_get_peer_pt            get;
-    ngx_event_free_peer_pt           free;
     ngx_http_limit_upstream_loc_t   *lnode;
     void                            *data;
     void                            *wait;
+
+    ngx_event_get_peer_pt            get;
+    ngx_event_free_peer_pt           free;
 } ngx_http_limit_upstream_ctx_t;
 
 
@@ -70,6 +74,15 @@ typedef struct {
 } ngx_http_limit_upstream_wait_t;
 
 
+static ngx_conf_enum_t ngx_http_limit_upstream_log_levels[] = {
+    { ngx_string("info"), NGX_LOG_INFO },
+    { ngx_string("notice"), NGX_LOG_NOTICE },
+    { ngx_string("warn"), NGX_LOG_WARN },
+    { ngx_string("error"), NGX_LOG_ERR },
+    { ngx_null_string, 0 }
+};
+
+
 static void ngx_http_limit_upstream_timeout(ngx_http_request_t *r);
 static void ngx_http_limit_upstream_cleanup(void *data);
 static void ngx_http_limit_upstream_free_peer(ngx_peer_connection_t *pc,
@@ -80,6 +93,8 @@ static ngx_int_t ngx_http_limit_upstream_init_peer(ngx_http_request_t *r,
     ngx_http_upstream_srv_conf_t *us);
 
 static void *ngx_http_limit_upstream_create_srv_conf(ngx_conf_t *cf);
+static char *ngx_http_limit_upstream_merge_srv_conf(ngx_conf_t *cf, void *parent,
+    void *child);
 static char *ngx_http_limit_upstream_zone(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_http_limit_upstream_conn(ngx_conf_t *cf, ngx_command_t *cmd,
@@ -114,6 +129,13 @@ static ngx_command_t ngx_http_limit_upstream_commands[] = {
       0,
       NULL },
 
+    { ngx_string("limit_upstream_log_level"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_UPS_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_enum_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_limit_upstream_conf_t, log_level),
+      &ngx_http_limit_upstream_log_levels },
+
       ngx_null_command
 };
 
@@ -126,7 +148,7 @@ static ngx_http_module_t ngx_http_limit_upstream_module_ctx = {
     NULL,
 
     ngx_http_limit_upstream_create_srv_conf,
-    NULL,
+    ngx_http_limit_upstream_merge_srv_conf,
 
     NULL,
     NULL
@@ -168,7 +190,7 @@ ngx_http_limit_upstream_timeout(ngx_http_request_t *r)
         return;
     }
 
-    ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
+    ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                   "limit upstream: request[%p] is timeout", r);
 
     wev->timedout = 0;
@@ -267,7 +289,7 @@ ngx_http_limit_upstream_cleanup(void *data)
 
     ctx = wnode->ctx;
 
-    ngx_log_error(NGX_LOG_NOTICE, ctx->r->connection->log, 0,
+    ngx_log_error(ctx->lucf->log_level, ctx->r->connection->log, 0,
                   "limit upstream: request[%p] is resumed", ctx->r);
 
     ctx->r->read_event_handler = wnode->read_event_handler;
@@ -445,7 +467,7 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
         snode->counter--;
 
         if (lnode->qlen >= ctx->lucf->backlog) {
-            ngx_log_error(NGX_LOG_NOTICE, ctx->r->connection->log, 0,
+            ngx_log_error(NGX_LOG_WARN, ctx->r->connection->log, 0,
                           "limit_upstream: request[%p] is dropped", ctx->r);
             return NGX_DECLINED;
         }
@@ -462,7 +484,7 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, ctx->r->connection->log, 0,
                        "limit upstream: add queue node: %p", &wnode->queue);
 
-        ngx_log_error(NGX_LOG_NOTICE, ctx->r->connection->log, 0,
+        ngx_log_error(ctx->lucf->log_level, ctx->r->connection->log, 0,
                       "limit upstream: request[%p] is blocked", ctx->r);
 
         wnode->ctx = ctx;
@@ -631,8 +653,23 @@ ngx_http_limit_upstream_create_srv_conf(ngx_conf_t *cf)
     conf->limit_conn = NGX_CONF_UNSET_UINT;
     conf->backlog = NGX_CONF_UNSET_UINT;
     conf->timeout = NGX_CONF_UNSET_MSEC;
+    conf->log_level = NGX_CONF_UNSET_UINT;
 
     return conf;
+}
+
+
+static char *
+ngx_http_limit_upstream_merge_srv_conf(ngx_conf_t *cf, void *parent,
+    void *child)
+{
+    ngx_http_limit_upstream_conf_t  *conf = child;
+    ngx_http_limit_upstream_conf_t  *prev = parent;
+
+    ngx_conf_merge_uint_value(conf->log_level,
+                              prev->log_level, NGX_LOG_NOTICE);
+
+    return NGX_CONF_OK;
 }
 
 
