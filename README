@@ -68,6 +68,12 @@ However, I did not test it on the other versions:)
 Ok, there is no bug found for now, however, some more features are needed:
 1. a request finished in any worker will trigger sending notify the other workers. So, the less wait, the faster whole system finishes.
 
+=CHANGES===============================================================
+
+1.1.0 not published, git trunk only, optimize for speed: when a request is fulfilled, more than one request pend to execute.
+
+1.0.0 [2012.5.31] initial version, including some small bugfix
+
 =MISUSE================================================================
 
 1. someone uses it like this:
