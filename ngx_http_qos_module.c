@@ -372,7 +372,9 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
     if (ctx->r->upstream->blocked) {
         rc = NGX_OK;
         ctx->r->upstream->blocked = 0;
+
         goto set_and_ret;
+
     } else {
         rc = ctx->get(pc, ctx->data);
         if (rc != NGX_OK && rc != NGX_DONE) {
