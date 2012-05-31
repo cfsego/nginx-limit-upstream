@@ -67,3 +67,43 @@ However, I did not test it on the other versions:)
 
 Ok, there is no bug found for now, however, some more features are needed:
 1. a request finished in any worker will trigger sending notify the other workers. So, the less wait, the faster whole system finishes.
+
+=MISUSE================================================================
+
+1. someone uses it like this:
+
+    limit_upstream_zone test 10m;
+
+    upstream bb {
+        server 127.0.0.1:3111;
+        server 127.0.0.1:3112;
+
+        limit_upstream_conn limit=8 zone=test backlog=2000 timeout=1500ms;
+    } 
+
+    upstream cc {
+        server 127.0.0.1:3111;
+        server 127.0.0.1:3112;
+
+        limit_upstream_conn limit=16 zone=test backlog=1000 timeout=500ms;
+    }
+
+    It will absolutely fail to work. The correct is:
+
+
+    limit_upstream_zone test_high 10m;
+    limit_upstream_zone test_low 10m;
+
+    upstream bb {
+        server 127.0.0.1:3111;
+        server 127.0.0.1:3112;
+
+        limit_upstream_conn limit=8 zone=test_low backlog=2000 timeout=1500ms;
+    }
+
+    upstream cc {
+        server 127.0.0.1:3111;
+        server 127.0.0.1:3112;
+
+        limit_upstream_conn limit=16 zone=test_high backlog=1000 timeout=500ms;
+    }
