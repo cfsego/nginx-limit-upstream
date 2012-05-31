@@ -266,70 +266,84 @@ ngx_http_limit_upstream_cleanup(void *data)
     if ((snode->counter != ctx->lucf->limit_conn && lnode->work)
         || lnode->qlen == 0)
     {
-        ngx_log_debug3(NGX_LOG_DEBUG_HTTP, ctx->r->connection->log, 0,
-                       "limit upstream: will not resume request"
+        ngx_log_debug4(NGX_LOG_DEBUG_HTTP, ctx->r->connection->log, 0,
+                       "limit upstream: will not resume request for %V "
                        "(counter: %d, active: %d, wait queue: %d)",
-                       snode->counter, lnode->work, lnode->qlen);
+                       pc->name, snode->counter, lnode->work, lnode->qlen);
 
         snode->counter--;
         lnode->counter--;
         return;
     }
 
-    q = ngx_queue_last(&lnode->wait);
-    wnode = ngx_queue_data(q, ngx_http_limit_upstream_wait_t, queue);
+    do {
+        q = ngx_queue_last(&lnode->wait);
+        wnode = ngx_queue_data(q, ngx_http_limit_upstream_wait_t, queue);
 
-    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, ctx->r->connection->log, 0,
-                   "limit upstream: remove queue node: %p", q);
+        ngx_log_debug5(NGX_LOG_DEBUG_HTTP, ctx->r->connection->log, 0,
+                       "limit upstream: remove queue node: %p for %V "
+                       "(counter: %d, active: %d, wait queue: %d)",
+                       q, pc->name, snode->counter,
+                       lnode->work, lnode->qlen);
 
-    ngx_queue_remove(q);
-    lnode->qlen--;
+        ngx_queue_remove(q);
+        lnode->qlen--;
 
-    /* resume a request in wait queue */
+        /* resume a request in wait queue */
 
-    ctx = wnode->ctx;
+        ctx = wnode->ctx;
 
-    ngx_log_error(ctx->lucf->log_level, ctx->r->connection->log, 0,
-                  "limit upstream: request[%p] is resumed", ctx->r);
+        ngx_log_error(ctx->lucf->log_level, ctx->r->connection->log, 0,
+                      "limit upstream: request[%p] is resumed", ctx->r);
 
-    ctx->r->read_event_handler = wnode->read_event_handler;
-    ctx->r->write_event_handler = wnode->write_event_handler;
+        ctx->r->read_event_handler = wnode->read_event_handler;
+        ctx->r->write_event_handler = wnode->write_event_handler;
 
-    if (wnode->r_timer_set) {
-        if (ctx->r->connection->read->timedout) {
-            ctx->r->read_event_handler(ctx->r);
-            return;
+        if (wnode->r_timer_set) {
+            if (ctx->r->connection->read->timedout) {
+                ctx->r->read_event_handler(ctx->r);
+                return;
+            }
+
+            if (ngx_handle_read_event(ctx->r->connection->read, 0)
+                != NGX_OK)
+            {
+                ngx_http_finalize_request(ctx->r,
+                                          NGX_HTTP_INTERNAL_SERVER_ERROR);
+                return;
+            }
+
+            ngx_add_timer(ctx->r->connection->read,
+                          ctx->r->connection->read->timer.key);
         }
 
-        if (ngx_handle_read_event(ctx->r->connection->read, 0) != NGX_OK) {
-            ngx_http_finalize_request(ctx->r, NGX_HTTP_INTERNAL_SERVER_ERROR);
-            return;
+        ngx_del_timer(ctx->r->connection->write);
+
+        if (wnode->w_timer_set) {
+            if (ctx->r->connection->write->timedout) {
+                ctx->r->write_event_handler(ctx->r);
+                return;
+            }
+
+            if (ngx_handle_write_event(ctx->r->connection->write, 0)
+                != NGX_OK)
+            {
+                ngx_http_finalize_request(ctx->r,
+                                          NGX_HTTP_INTERNAL_SERVER_ERROR);
+                return;
+            }
+
+            ngx_add_timer(ctx->r->connection->write,
+                          ctx->r->connection->write->timer.key);
         }
 
-        ngx_add_timer(ctx->r->connection->read,
-                      ctx->r->connection->read->timer.key);
-    }
+        lnode->work++;
 
-    ngx_del_timer(ctx->r->connection->write);
+        ngx_http_upstream_connect(ctx->r, ctx->r->upstream);
+    } while (ngx_atomic_fetch_add(&snode->counter, 1)
+             < ctx->lucf->limit_conn && lnode->qlen);
 
-    if (wnode->w_timer_set) {
-        if (ctx->r->connection->write->timedout) {
-            ctx->r->write_event_handler(ctx->r);
-            return;
-        }
-
-        if (ngx_handle_write_event(ctx->r->connection->write, 0) != NGX_OK) {
-            ngx_http_finalize_request(ctx->r, NGX_HTTP_INTERNAL_SERVER_ERROR);
-            return;
-        }
-
-        ngx_add_timer(ctx->r->connection->write,
-                      ctx->r->connection->write->timer.key);
-    }
-
-    lnode->work++;
-
-    ngx_http_upstream_connect(ctx->r, ctx->r->upstream);
+    snode->counter--;
 }
 
 
@@ -452,10 +466,10 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
         goto set_and_ret;
     }
 
-    ngx_log_debug3(NGX_LOG_DEBUG_HTTP, ctx->r->connection->log, 0,
-                   "limit upstream: status"
+    ngx_log_debug4(NGX_LOG_DEBUG_HTTP, ctx->r->connection->log, 0,
+                   "limit upstream: status for %V "
                    "(counter: %d, active: %d, wait queue: %d)",
-                   snode->counter, lnode->work, lnode->qlen);
+                   pc->name, snode->counter, lnode->work, lnode->qlen);
 
 #if (NGX_DEBUG)
     active = ngx_atomic_fetch_add(&snode->counter, 1);
@@ -604,8 +618,10 @@ ngx_http_limit_upstream_init(ngx_conf_t *cf)
     ngx_http_upstream_srv_conf_t   **uscfp;
     ngx_http_upstream_main_conf_t   *umcf;
 
-    umcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_upstream_module);
-    mlucf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_limit_upstream_module);
+    umcf = ngx_http_conf_get_module_main_conf(cf,
+                                              ngx_http_upstream_module);
+    mlucf = ngx_http_conf_get_module_srv_conf(cf,
+                                           ngx_http_limit_upstream_module);
     uscfp = umcf->upstreams.elts;
 
     ngx_rbtree_init(&ngx_http_limit_upstream_loc_rbtree,
