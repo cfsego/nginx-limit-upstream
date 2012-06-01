@@ -2,11 +2,13 @@ Limit upstream module for nginx
 
 =OVERVIEW===============================================================
 
-Maybe you will face such problem: a upstream server is able to achieve high QPS within a relatively low load, for example, mysql, 8000-9000QPS when the connections within 60. Moreover, there is no usable module fit for the case to limit the load to a upstream server and keep the server running fast, so far. The limit_request module can not do the thing, and limit_zone module is too violent.
+  When you use nginx as a proxy, there is a problem you may have to face: a upstream server is able to achieve high QPS within a relatively low resource stress. For example, mysql works well at the speed of 8000-9000 QPS within 60 parallel connections, but only 2000 QPS when the number of connections increases to 500.
 
-This is a try, the module will limit the number of connections to a upstream server. With it, we could control the upstream load. When the number of upstream connections comes up to the set threshold, more request from clients will suspend and wait until a upstream request finishes. You can specify the length of waiting queue, and the waiting timeout too.
+  I do not find any module that will solve the problem because they all face client, not the upstream. I tried the limit_req, but failed. when I write down "limit_req rate=8000/s", I find there are over 2000 active connections between nginx and mysql, and when I write down "limit_req rate=60/s", Jesus, it is really 60 QPS for my nginx.
 
-The strategy for the module is 'suspend util someone wake you up'. Each worker do the same thing independently, however, with a global counter. A special case is allow to go upstream even when the limit is reached: there is no request go upstream and not finish for that time. So the maximum number of established connections to a upstream server is ('limit' + 'worker_processes').
+  So, I have a try, and the limit_upstream module comes. This module will limit the number of connections to a upstream server identified by its ip address. With it, I could control the upstream connections. When it reaches the set threshold, new requests will suspend and wait until a active upstream request finishes and wake them up, otherwise, they will die when they get timeout. Of course, I can also specify the length of waiting queue, and the waiting timeout, as limit_req do.
+
+  In this module, each worker suspend its requests when upstreams' counters reach the threshold, and resume them or cancel them all by itself. The only things they share are the global upstreams' counters. A special case for a request be allowed to go to upstream even when the threshold is reached is that, no request related to that upstream is being processed at that time for the worker. as a result, the maximum number of established connections to a upstream server is ('limit' + 'worker_processes').
 
 =MANUAL=================================================================
 
@@ -14,7 +16,7 @@ Example:
 
 http {
     server {
-        location           =/fc {
+        location           =/test {
             proxy_pass      http://pool;
         }
     }
@@ -34,21 +36,21 @@ syntax:  limit_upstream_zone zone_name size;
 default: -
 context: http
 
-Define a share memory pool for the module.
+Define a shared memory pool for the module.
 
 syntax:  limit_upstream_conn zone=zone_name limit=limit [backlog=length] [timeout=timeout | nodelay];
 default: -
 context: upstream
 
-Set a zone, the maximum allowed for each server of the upstream, the backlog length, and the timeout for each suspended request. The default for 'backlog' is 1000, and it for 'timeout' is the same.
+Set the zone used, the maximum allowed for each server of the upstream, the backlog length, and the timeout for each suspended request. The default for 'backlog' is 1000, and the default for 'timeout' is 1000 ms.
 
-When backlog for a server is full, it may use other server, Otherwise, it wait in the queue. The timeout will cause 408 return status code.
+When backlog for a server is full, it may use other server, Otherwise, it wait in the queue. Timeout will cause 408 return status code.
 
 syntax:  limit_upstream_log_level [ error | warn | notice | info ];
 default: limit_upstream_log_level notice;
-context: http, upstram
+context: http, upstream
 
-define the log level of ordinary logs for the module. However it is absolutely "WARN" for timeout or direct dropoff.
+define the log level of ordinary logs for the module. However it is absolutely "WARN" for timeout or discard.
 
 =INSTALL===============================================================
 
@@ -60,19 +62,17 @@ make install
 
 =PATCH=================================================================
 
-The patch is based on nginx 1.0.11, and it is compatible with nginx 1.2.0.
-However, I did not test it on the other versions:)
+  The patch is based on nginx 1.0.11, and it is compatible with nginx 1.2.0. However, I did not test it on the other versions :)
 
 =BUGS==================================================================
 
-Ok, there is no bug found for now, however, some more features are needed:
-1. a request finished in any worker will trigger sending notify the other workers. So, the less wait, the faster whole system finishes.
+  There is no new bug found for now. Any bug? Let me know it.
 
 =CHANGES===============================================================
 
-1.1.0 not published, git trunk only, optimize for speed: when a request is fulfilled, more than one request pend to execute.
+  1.1.0 not published, git trunk only, optimize for efficiency: when a request is fulfilled, more than one request pend to run.
 
-1.0.0 [2012.5.31] initial version, including some small bugfix
+  1.0.0 [2012.5.31] initial version, including some bug fixes.
 
 =MISUSE================================================================
 
@@ -94,8 +94,7 @@ Ok, there is no bug found for now, however, some more features are needed:
         limit_upstream_conn limit=16 zone=test backlog=1000 timeout=500ms;
     }
 
-    It will absolutely fail to work. The correct is:
-
+  It will absolutely fail to work. The correct is:
 
     limit_upstream_zone test_high 10m;
     limit_upstream_zone test_low 10m;
