@@ -91,7 +91,7 @@ However, I did not test it on the other versions :)
 if a request uses a server, and the server fails, then the request tries another
 server with the help of ngx_http_upstream_next, however, the counter of the
 former server is not decreased, then the whole system fails to work after a number
-of such fails. And it still exists.
+of such fails. Though I'm going to fix it, the bug is still exists now.
 
 =CHANGES===============================================================
 
