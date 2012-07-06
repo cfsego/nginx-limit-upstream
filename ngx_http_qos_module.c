@@ -610,7 +610,7 @@ ngx_http_limit_upstream_init_peer(ngx_http_request_t *r,
     ngx_http_limit_upstream_ctx_t   *ctx;
     ngx_http_limit_upstream_conf_t  *lucf;
 
-    ctx = ngx_palloc(r->pool, sizeof(ngx_http_limit_upstream_ctx_t));
+    ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_limit_upstream_ctx_t));
     if (ctx == NULL) {
         return NGX_ERROR;
     }
