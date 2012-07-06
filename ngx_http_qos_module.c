@@ -59,6 +59,8 @@ typedef struct {
     void                            *data;
     void                            *wait;
 
+    unsigned                         in:1;
+
     ngx_event_get_peer_pt            get;
     ngx_event_free_peer_pt           free;
 } ngx_http_limit_upstream_ctx_t;
@@ -390,6 +392,32 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
         goto set_and_ret;
 
     } else {
+
+        if (ctx->in) {
+
+            sin = (struct sockaddr_in *) pc->sockaddr;
+            node_s = ngx_http_limit_upstream_rbtree_lookup(shmctx->rbtree,
+                                                           sin->sin_addr.s_addr,
+                                                           sin->sin_port);
+
+            node_l = ngx_http_limit_upstream_rbtree_lookup(
+                                            &ngx_http_limit_upstream_loc_rbtree,
+                                            sin->sin_addr.s_addr,
+                                            sin->sin_port);
+
+            if (node_l && node_s) {
+                cnode = (ngx_http_limit_upstream_node_t *) &node_s->color;
+                snode = (ngx_http_limit_upstream_shm_t *) &cnode->counter;
+
+                cnode = (ngx_http_limit_upstream_node_t *) &node_l->color;
+                lnode = (ngx_http_limit_upstream_loc_t *) &cnode->counter;
+
+                lnode->work--;
+                snode->counter--;
+                lnode->counter--;
+            }
+        }
+
         rc = ctx->get(pc, ctx->data);
         if (rc != NGX_OK && rc != NGX_DONE) {
             return rc;
@@ -567,6 +595,8 @@ set_and_ret:
 
     cln->handler = ngx_http_limit_upstream_cleanup;
     cln->data = ctx;
+
+    ctx->in = 1;
 
     return rc;
 }
