@@ -59,7 +59,8 @@ typedef struct {
     void                            *data;
     void                            *wait;
 
-    unsigned                         in:1;
+    unsigned                         in_proc:1;
+    unsigned                         cln:1;
 
     ngx_event_get_peer_pt            get;
     ngx_event_free_peer_pt           free;
@@ -231,6 +232,10 @@ ngx_http_limit_upstream_cleanup(void *data)
     ctx = (ngx_http_limit_upstream_ctx_t *) data;
     shmctx = ctx->lucf->shm_zone->data;
 
+    if (!ctx->in_proc) {
+        return;
+    }
+
     pc = &ctx->r->upstream->peer;
     sin = (struct sockaddr_in *) pc->sockaddr;
 
@@ -265,7 +270,7 @@ ngx_http_limit_upstream_cleanup(void *data)
 
     lnode->work--;
 
-    if ((snode->counter != ctx->lucf->limit_conn && lnode->work)
+    if ((snode->counter > ctx->lucf->limit_conn && lnode->work)
         || lnode->qlen == 0)
     {
         ngx_log_debug4(NGX_LOG_DEBUG_HTTP, ctx->r->connection->log, 0,
@@ -393,7 +398,7 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
 
     } else {
 
-        if (ctx->in) {
+        if (ctx->in_proc) {
 
             sin = (struct sockaddr_in *) pc->sockaddr;
             node_s = ngx_http_limit_upstream_rbtree_lookup(shmctx->rbtree,
@@ -416,6 +421,8 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
                 snode->counter--;
                 lnode->counter--;
             }
+
+            ctx->in_proc = 0;
         }
 
         rc = ctx->get(pc, ctx->data);
@@ -588,15 +595,19 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
 
 set_and_ret:
 
-    cln = ngx_http_cleanup_add(ctx->r, 0);
-    if (cln == NULL) {
-        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    if (!ctx->cln) {
+        cln = ngx_http_cleanup_add(ctx->r, 0);
+        if (cln == NULL) {
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        }
+
+        cln->handler = ngx_http_limit_upstream_cleanup;
+        cln->data = ctx;
+
+        ctx->cln = 1;
     }
 
-    cln->handler = ngx_http_limit_upstream_cleanup;
-    cln->data = ctx;
-
-    ctx->in = 1;
+    ctx->in_proc = 1;
 
     return rc;
 }
