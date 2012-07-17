@@ -96,8 +96,7 @@ of such fails.
 
 =CHANGES===============================================================
 
-  1.1.0 not published, git trunk only, optimize for efficiency:
-        when a request is fulfilled, more than one request pend to run.
+  1.1.0 [2012.7.17] bugfixed, and optimize for efficiency, 10% faster.
 
   1.0.0 [2012.5.31] initial version, including some bug fixes.
 
