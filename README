@@ -74,7 +74,9 @@ However it is absolutely "WARN" for timeout or discard.
 
 =INSTALL===============================================================
 
-patch -p2 < nginx.patch
+patch -p2 < nginx.patch (nginx 1.0.X, 1.2.X)
+or
+patch -p1 < nginx.1.4.3.patch (nginx 1.4.X)
 
 ./configure --add-module=/path/to/module
 make
@@ -82,10 +84,15 @@ make install
 
 =PATCH=================================================================
 
-  The patch is based on nginx 1.0.11, and it is compatible with nginx 1.2.0.
+  The nginx.patch is based on nginx 1.0.11, and it is compatible with nginx 1.2.0.
 However, I did not test it on the other versions :)
+  The nginx.1.4.3.patch is based on nginx 1.4.3, and tested only under nginx 1.4.3.
 
 =BUGS==================================================================
+
+* bugfixed    2013.11.11
+  The worker crushes after it processes a request. The problem occurs under
+nginx 1.4.3, because nginx sets u->sockaddr to NULL before my module uses it.
 
 * bugfixed    2012.7.9
   There is a critical bug that may make upstreams stuck. The description is
@@ -96,9 +103,21 @@ of such fails.
 
 =CHANGES===============================================================
 
+  1.2.0 [2013.11.11] fixed a bug occured under nginx 1.4.3, new patch for nginx 1.4.3
+
   1.1.0 [2012.7.17] bugfixed, and optimize for efficiency, 10% faster.
 
   1.0.0 [2012.5.31] initial version, including some bug fixes.
+
+=USED WITH UPSTREAM KEEPALIVE==========================================
+
+  Once nginx upstream keepalive module returns NGX_DONE, it means there is already
+one setup connection, so my module let the request pass, no matter it overpasses the
+threshold or not. There is a problem with this case (when the number reaches, nginx
+trends to distribute upstream connections for newcomers among workers at the proportion
+of connections already setup, and it is unfair). I think set keepalive as formula below,
+  keepalive = limit_conn / worker_processes
+may resolve the problem.
 
 =MISUSE================================================================
 
@@ -111,7 +130,7 @@ of such fails.
         server 127.0.0.1:3112;
 
         limit_upstream_conn limit=8 zone=test backlog=2000 timeout=1500ms;
-    } 
+    }
 
     upstream cc {
         server 127.0.0.1:3111;
