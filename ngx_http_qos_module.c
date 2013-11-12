@@ -64,6 +64,8 @@ typedef struct {
 
     ngx_event_get_peer_pt            get;
     ngx_event_free_peer_pt           free;
+
+    struct sockaddr                 *sockaddr;
 } ngx_http_limit_upstream_ctx_t;
 
 
@@ -237,7 +239,7 @@ ngx_http_limit_upstream_cleanup(void *data)
     }
 
     pc = &ctx->r->upstream->peer;
-    sin = (struct sockaddr_in *) pc->sockaddr;
+    sin = (struct sockaddr_in *) ctx->sockaddr;
 
     node_s = ngx_http_limit_upstream_rbtree_lookup(shmctx->rbtree,
                                                    sin->sin_addr.s_addr,
@@ -400,7 +402,7 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
 
         if (ctx->in_proc) {
 
-            sin = (struct sockaddr_in *) pc->sockaddr;
+            sin = (struct sockaddr_in *) ctx->sockaddr;
             node_s = ngx_http_limit_upstream_rbtree_lookup(shmctx->rbtree,
                                                            sin->sin_addr.s_addr,
                                                            sin->sin_port);
@@ -431,7 +433,15 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
         }
     }
 
-    sin = (struct sockaddr_in *) pc->sockaddr;
+    ctx->sockaddr = ngx_palloc(ctx->r->pool, pc->socklen);
+    if (ctx->sockaddr == NULL) {
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    ngx_memcpy(ctx->sockaddr, pc->sockaddr, pc->socklen);
+
+    sin = (struct sockaddr_in *) ctx->sockaddr;
+
     node_s = ngx_http_limit_upstream_rbtree_lookup(shmctx->rbtree,
                                                    sin->sin_addr.s_addr,
                                                    sin->sin_port);
