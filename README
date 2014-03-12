@@ -76,7 +76,7 @@ However it is absolutely "WARN" for timeout or discard.
 
 patch -p2 < nginx.patch (nginx 1.0.X, 1.2.X)
 or
-patch -p1 < nginx.1.4.3.patch (nginx 1.4.X)
+patch -p1 < nginx.1.4.4.patch (nginx 1.4.X)
 
 ./configure --add-module=/path/to/module
 make
@@ -86,7 +86,7 @@ make install
 
   The nginx.patch is based on nginx 1.0.11, and it is compatible with nginx 1.2.0.
 However, I did not test it on the other versions :)
-  The nginx.1.4.3.patch is based on nginx 1.4.3, and tested only under nginx 1.4.3.
+  The nginx.1.4.4.patch is based on nginx 1.4.4, and tested only under nginx 1.4.4.
 
 =BUGS==================================================================
 
