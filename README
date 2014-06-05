@@ -90,6 +90,10 @@ However, I did not test it on the other versions :)
 
 =BUGS==================================================================
 
+* bugfixed    2014.6.5
+  Local variable 'pc' is only used for printing debug infomation, so there is a
+warning when compiling nginx without the configuration '--with-debug'.
+
 * bugfixed    2013.11.11
   The worker crushes after it processes a request. The problem occurs under
 nginx 1.4.3, because nginx sets u->sockaddr to NULL before my module uses it.
@@ -103,7 +107,9 @@ of such fails.
 
 =CHANGES===============================================================
 
-  1.2.0 [2013.11.11] fixed a bug occured under nginx 1.4.3, new patch for nginx 1.4.3
+  1.2.1 [2013.6.5] fixed a bug variable 'pc' is unused.
+
+  1.2.0 [2013.11.11] fixed a bug occured under nginx 1.4.4, new patch for nginx 1.4.4
 
   1.1.0 [2012.7.17] bugfixed, and optimize for efficiency, 10% faster.
 
