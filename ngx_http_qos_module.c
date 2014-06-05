@@ -223,7 +223,9 @@ ngx_http_limit_upstream_cleanup(void *data)
     ngx_queue_t                     *q;
     ngx_rbtree_node_t               *node_s, *node_l;
     struct sockaddr_in              *sin;
+#if NGX_DEBUG
     ngx_peer_connection_t           *pc;
+#endif
     ngx_http_limit_upstream_ctx_t   *ctx;
     ngx_http_limit_upstream_loc_t   *lnode;
     ngx_http_limit_upstream_shm_t   *snode;
@@ -238,7 +240,9 @@ ngx_http_limit_upstream_cleanup(void *data)
         return;
     }
 
+#if NGX_DEBUG
     pc = &ctx->r->upstream->peer;
+#endif
     sin = (struct sockaddr_in *) ctx->sockaddr;
 
     node_s = ngx_http_limit_upstream_rbtree_lookup(shmctx->rbtree,
