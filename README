@@ -74,9 +74,14 @@ However it is absolutely "WARN" for timeout or discard.
 
 =INSTALL===============================================================
 
-patch -p2 < nginx.patch (nginx 1.0.X, 1.2.X)
-or
-patch -p1 < nginx.1.4.4.patch (nginx 1.4.X)
+(nginx 1.0.X, 1.2.X)
+patch -p2 < nginx.patch
+or (nginx 1.4.X)
+patch -p1 < nginx.1.4.4.patch
+or (nginx 1.10)
+patch -p1 < nginx.1.10.patch
+or (nginx 1.10 on debian)
+cp /path/to/module/nginx-1.10.patch /path/to/nginx-1.10.0/debian/patches
 
 ./configure --add-module=/path/to/module
 make
