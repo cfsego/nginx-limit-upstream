@@ -29,7 +29,7 @@ established connections to a upstream server is ('limit' + 'worker_processes').
 =MANUAL=================================================================
 
 Example:
-
+
 http {
     server {
         location           =/test {
@@ -76,7 +76,13 @@ However it is absolutely "WARN" for timeout or discard.
 
 patch -p2 < nginx.patch (nginx 1.0.X, 1.2.X)
 or
-patch -p1 < nginx.1.4.4.patch (nginx 1.4.X)
+patch -p1 < nginx.1.4.4.patch (nginx 1.4.X, nginx 1.6.X)
+or
+patch -p0 < nginx.1.8.1.patch  (nginx 1.8.X, nginx 1.9.X)
+or
+patch -p0 < nginx.1.10.1.patch  (nginx 1.10.X)
+or
+cp /path/to/module/nginx.1.10.1.patch /path/to/nginx-1.10.0/debian/patches (nginx 1.10 on debian)
 
 ./configure --add-module=/path/to/module
 make
@@ -87,6 +93,8 @@ make install
   The nginx.patch is based on nginx 1.0.11, and it is compatible with nginx 1.2.0.
 However, I did not test it on the other versions :)
   The nginx.1.4.4.patch is based on nginx 1.4.4, and tested only under nginx 1.4.4.
+  And there is patches for nginx.1.8.1 and 1.10.1.
+  Thanks to @ivan-antonyuck, who made patch for nginx 1.10.X and 1.10 on debian.
 
 =BUGS==================================================================
 
