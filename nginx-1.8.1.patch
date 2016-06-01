@@ -1,0 +1,105 @@
+--- src/http/ngx_http_upstream.h.1.8.1	2016-06-01 12:13:21.314144886 +0800
++++ src/http/ngx_http_upstream.h	2016-06-01 12:13:32.678144596 +0800
+@@ -367,6 +367,7 @@
+ 
+     unsigned                         request_sent:1;
+     unsigned                         header_sent:1;
++    unsigned                         blocked:1;
+ };
+ 
+ 
+@@ -399,6 +400,8 @@
+ ngx_int_t ngx_http_upstream_hide_headers_hash(ngx_conf_t *cf,
+     ngx_http_upstream_conf_t *conf, ngx_http_upstream_conf_t *prev,
+     ngx_str_t *default_hide_headers, ngx_hash_init_t *hash);
++void ngx_http_upstream_connect(ngx_http_request_t *r,
++    ngx_http_upstream_t *u);
+ 
+ 
+ #define ngx_http_conf_upstream_srv_conf(uscf, module)                         \
+--- src/http/ngx_http_upstream.c.1.8.1	2016-06-01 12:13:21.318144886 +0800
++++ src/http/ngx_http_upstream.c	2016-06-01 12:18:01.790137730 +0800
+@@ -31,8 +31,6 @@
+ static void ngx_http_upstream_wr_check_broken_connection(ngx_http_request_t *r);
+ static void ngx_http_upstream_check_broken_connection(ngx_http_request_t *r,
+     ngx_event_t *ev);
+-static void ngx_http_upstream_connect(ngx_http_request_t *r,
+-    ngx_http_upstream_t *u);
+ static ngx_int_t ngx_http_upstream_reinit(ngx_http_request_t *r,
+     ngx_http_upstream_t *u);
+ static void ngx_http_upstream_send_request(ngx_http_request_t *r,
+@@ -1299,40 +1297,46 @@
+ }
+ 
+ 
+-static void
++void
+ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
+ {
+     ngx_int_t          rc;
+     ngx_time_t        *tp;
+     ngx_connection_t  *c;
+ 
+-    r->connection->log->action = "connecting to upstream";
++    if (!u->blocked) {
++        r->connection->log->action = "connecting to upstream";
+ 
+-    if (u->state && u->state->response_sec) {
+-        tp = ngx_timeofday();
+-        u->state->response_sec = tp->sec - u->state->response_sec;
+-        u->state->response_msec = tp->msec - u->state->response_msec;
+-    }
++        if (u->state && u->state->response_sec) {
++            tp = ngx_timeofday();
++            u->state->response_sec = tp->sec - u->state->response_sec;
++            u->state->response_msec = tp->msec - u->state->response_msec;
++        }
+ 
+-    u->state = ngx_array_push(r->upstream_states);
+-    if (u->state == NULL) {
+-        ngx_http_upstream_finalize_request(r, u,
+-                                           NGX_HTTP_INTERNAL_SERVER_ERROR);
+-        return;
+-    }
++        u->state = ngx_array_push(r->upstream_states);
++        if (u->state == NULL) {
++            ngx_http_upstream_finalize_request(r, u,
++                                               NGX_HTTP_INTERNAL_SERVER_ERROR);
++            return;
++        }
+ 
+-    ngx_memzero(u->state, sizeof(ngx_http_upstream_state_t));
++        ngx_memzero(u->state, sizeof(ngx_http_upstream_state_t));
+ 
+-    tp = ngx_timeofday();
+-    u->state->response_sec = tp->sec;
+-    u->state->response_msec = tp->msec;
+-    u->state->header_sec = (time_t) NGX_ERROR;
++        tp = ngx_timeofday();
++        u->state->response_sec = tp->sec;
++        u->state->response_msec = tp->msec;
++        u->state->header_sec = (time_t) NGX_ERROR;
++    }
+ 
+     rc = ngx_event_connect_peer(&u->peer);
+ 
+     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                    "http upstream connect: %i", rc);
+ 
++    if (rc == NGX_BLOCK) {
++        return;
++    }
++
+     if (rc == NGX_ERROR) {
+         ngx_http_upstream_finalize_request(r, u,
+                                            NGX_HTTP_INTERNAL_SERVER_ERROR);
+--- src/core/ngx_core.h.1.8.1	2016-06-01 12:13:21.318144886 +0800
++++ src/core/ngx_core.h	2016-06-01 12:13:32.674144596 +0800
+@@ -40,6 +40,7 @@
+ #define  NGX_DONE       -4
+ #define  NGX_DECLINED   -5
+ #define  NGX_ABORT      -6
++#define  NGX_BLOCK      -7
+ 
+ 
+ #include <ngx_errno.h>
