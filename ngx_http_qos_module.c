@@ -508,6 +508,8 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
         snode = (ngx_http_limit_upstream_shm_t *) &cnode->counter;
     }
 
+    snode->last = ngx_current_msec;
+
     if (rc == NGX_DONE) {
         snode->counter++;
         lnode->counter++;
