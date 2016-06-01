@@ -98,6 +98,11 @@ However, I did not test it on the other versions :)
 
 =BUGS==================================================================
 
+* bugfixed    2016.6.1
+  The rbtree node are always deleted after reload, because snode->last is the timestamp
+  used for removing useless node, but has never been set a value. This will cause the
+  module to allow any request to pass after reload.
+
 * bugfixed    2014.6.5
   Local variable 'pc' is only used for printing debug infomation, so there is a
 warning when compiling nginx without the configuration '--with-debug'.
