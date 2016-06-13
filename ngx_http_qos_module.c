@@ -65,6 +65,11 @@ typedef struct {
     ngx_event_get_peer_pt            get;
     ngx_event_free_peer_pt           free;
 
+#if (NGX_HTTP_SSL)
+    ngx_event_set_peer_session_pt    set_session;
+    ngx_event_save_peer_session_pt   save_session;
+#endif
+
     struct sockaddr                 *sockaddr;
 } ngx_http_limit_upstream_ctx_t;
 
@@ -94,6 +99,13 @@ static void ngx_http_limit_upstream_free_peer(ngx_peer_connection_t *pc,
     void *data, ngx_uint_t state);
 static ngx_int_t ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc,
     void *data);
+#if (NGX_HTTP_SSL)
+static ngx_int_t ngx_http_limit_upstream_set_peer_session(
+    ngx_peer_connection_t *pc, void *data);
+static void ngx_http_limit_upstream_save_peer_session(ngx_peer_connection_t *pc,
+    void *data);
+#endif
+
 static ngx_int_t ngx_http_limit_upstream_init_peer(ngx_http_request_t *r,
     ngx_http_upstream_srv_conf_t *us);
 
@@ -659,6 +671,14 @@ ngx_http_limit_upstream_init_peer(ngx_http_request_t *r,
     ctx->free = r->upstream->peer.free;
     r->upstream->peer.free = ngx_http_limit_upstream_free_peer;
 
+#if (NGX_HTTP_SSL)
+    ctx->set_session = r->upstream->peer.set_session;
+    r->upstream->peer.set_session = ngx_http_limit_upstream_set_peer_session;
+
+    ctx->save_session = r->upstream->peer.save_session;
+    r->upstream->peer.save_session = ngx_http_limit_upstream_save_peer_session;
+#endif
+
     ctx->r = r;
     ctx->lucf = lucf;
     r->upstream->blocked = 0;
@@ -1056,3 +1076,41 @@ ngx_http_limit_upstream_rbtree_insert_value(ngx_rbtree_node_t *temp,
     node->right = sentinel;
     ngx_rbt_red(node);
 }
+
+
+#if (NGX_HTTP_SSL)
+
+static ngx_int_t
+ngx_http_limit_upstream_set_peer_session(ngx_peer_connection_t *pc, void *data)
+{
+    ngx_http_limit_upstream_ctx_t   *ctx;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, pc->log, 0,
+                   "limit upstream: set session");
+
+    ctx = (ngx_http_limit_upstream_ctx_t *) data;
+
+    if (ctx->set_session) {
+        return ctx->set_session(pc, ctx->data);
+    }
+
+    return NGX_OK;
+}
+
+
+static void
+ngx_http_limit_upstream_save_peer_session(ngx_peer_connection_t *pc, void *data)
+{
+    ngx_http_limit_upstream_ctx_t   *ctx;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, pc->log, 0,
+                   "limit upstream: save session");
+
+    ctx = (ngx_http_limit_upstream_ctx_t *) data;
+
+    if (ctx->save_session) {
+        ctx->save_session(pc, ctx->data);
+    }
+}
+
+#endif
