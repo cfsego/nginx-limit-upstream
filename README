@@ -98,7 +98,7 @@ However, I did not test it on the other versions :)
 
 =BUGS==================================================================
 
-* bugfixed    2016.6.11
+* bugfixed    2016.6.13
   The requests are choked when proxying https to backend. The cause is it transfers
   invalid data to set_session().
 
