@@ -56,7 +56,7 @@ context: http
 
 syntax:  limit_upstream_conn zone=zone_name limit=limit [backlog=length] [timeout=timeout | nodelay];
 default: -
-context: upstream
+context: upstream
 
   Set the zone used, the maximum allowed for each server of the upstream,
 the backlog length, and the timeout for each suspended request.
@@ -97,6 +97,10 @@ However, I did not test it on the other versions :)
   Thanks to @ivan-antonyuck, who made patch for nginx 1.10.X and 1.10 on debian.
 
 =BUGS==================================================================
+
+* bugfixed    2016.6.11
+  The requests are choked when proxying https to backend. The cause is it transfers
+  invalid data to set_session().
 
 * bugfixed    2016.6.1
   The rbtree node are always deleted after reload, because snode->last is the timestamp
