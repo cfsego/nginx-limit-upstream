@@ -29,7 +29,7 @@ established connections to a upstream server is ('limit' + 'worker_processes').
 =MANUAL=================================================================
 
 Example:
-
+
 http {
     server {
         location           =/test {
@@ -56,7 +56,7 @@ context: http
 
 syntax:  limit_upstream_conn zone=zone_name limit=limit [backlog=length] [timeout=timeout | nodelay];
 default: -
-context: upstream
+context: upstream
 
   Set the zone used, the maximum allowed for each server of the upstream,
 the backlog length, and the timeout for each suspended request.
