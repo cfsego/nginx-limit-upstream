@@ -21,6 +21,8 @@ typedef struct {
     ngx_http_upstream_init_peer_pt   init;
 
     ngx_uint_t                       log_level;
+
+    unsigned                         hooked:1;
 } ngx_http_limit_upstream_conf_t;
 
 
@@ -140,7 +142,7 @@ static ngx_command_t ngx_http_limit_upstream_commands[] = {
       NULL },
 
     { ngx_string("limit_upstream_conn"),
-      NGX_HTTP_UPS_CONF|NGX_CONF_TAKE1234,
+      NGX_HTTP_UPS_CONF|NGX_CONF_TAKE1234|NGX_CONF_TAKE5,
       ngx_http_limit_upstream_conn,
       NGX_HTTP_SRV_CONF_OFFSET,
       0,
@@ -711,7 +713,7 @@ ngx_http_limit_upstream_init(ngx_conf_t *cf)
             lucf = uscfp[i]->
                         srv_conf[ngx_http_limit_upstream_module.ctx_index];
 
-            if (lucf->limit_conn != NGX_CONF_UNSET_UINT) {
+            if (lucf->limit_conn != NGX_CONF_UNSET_UINT && !lucf->hooked) {
                 lucf->init = uscfp[i]->peer.init;
                 uscfp[i]->peer.init = ngx_http_limit_upstream_init_peer;
 
@@ -751,6 +753,7 @@ ngx_http_limit_upstream_create_srv_conf(ngx_conf_t *cf)
      *
      * conf->init = NULL;
      * conf->shm_zone = NULL;
+     * conf->hooked = 0;
      */
 
     conf->limit_conn = NGX_CONF_UNSET_UINT;
@@ -831,6 +834,7 @@ ngx_http_limit_upstream_conn(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_str_t                       *value, s;
     ngx_uint_t                       i;
+    ngx_http_upstream_srv_conf_t    *uscf;
 
     ngx_http_limit_upstream_conf_t  *lucf = conf;
 
@@ -838,11 +842,13 @@ ngx_http_limit_upstream_conn(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return "is duplicate";
     }
 
+    uscf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_upstream_module);
+
     value = cf->args->elts;
 
     for (i = 1; i < cf->args->nelts; i++) {
 
-        if (ngx_strncmp(value[i].data, "zone=", 5) == 0) {
+        if (ngx_strncmp("zone=", value[i].data, 5) == 0) {
 
             s.len = value[i].len - 5;
             s.data = value[i].data + 5;
@@ -856,7 +862,7 @@ ngx_http_limit_upstream_conn(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             continue;
         }
 
-        if (ngx_strncmp(value[i].data, "limit=", 6) == 0) {
+        if (ngx_strncmp("limit=", value[i].data, 6) == 0) {
             lucf->limit_conn = ngx_atoi(value[i].data + 6, value[i].len - 6);
             if (lucf->limit_conn <= 0) {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -867,7 +873,7 @@ ngx_http_limit_upstream_conn(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             continue;
         }
 
-        if (ngx_strncmp(value[i].data, "backlog=", 8) == 0) {
+        if (ngx_strncmp("backlog=", value[i].data, 8) == 0) {
 
             lucf->backlog = ngx_atoi(value[i].data + 8, value[i].len - 8);
             if (lucf->backlog <= 0) {
@@ -879,12 +885,12 @@ ngx_http_limit_upstream_conn(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             continue;
         }
 
-        if (ngx_strncmp(value[i].data, "nodelay", 7) == 0) {
+        if (ngx_strncmp("nodelay", value[i].data, 7) == 0) {
             lucf->backlog = 0;
             continue;
         }
 
-        if (ngx_strncmp(value[i].data, "timeout=", 8) == 0) {
+        if (ngx_strncmp("timeout=", value[i].data, 8) == 0) {
 
             s.len = value[i].len - 8;
             s.data = value[i].data + 8;
@@ -896,6 +902,13 @@ ngx_http_limit_upstream_conn(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                 return NGX_CONF_ERROR;
             }
 
+            continue;
+        }
+
+        if (ngx_strncmp("instant_hook", value[i].data, 12) == 0) {
+            lucf->init = uscf->peer.init;
+            uscf->peer.init = ngx_http_limit_upstream_init_peer;
+            lucf->hooked = 1;
             continue;
         }
 
@@ -916,6 +929,20 @@ ngx_http_limit_upstream_conn(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                            "\"%V\" must have \"zone\" parameter",
                            &cmd->name);
         return NGX_CONF_ERROR;
+    }
+
+    if (lucf->hooked) {
+        if (lucf->backlog == NGX_CONF_UNSET_UINT) {
+            lucf->backlog = 1000;
+        }
+
+        if (lucf->timeout == NGX_CONF_UNSET_MSEC) {
+            lucf->timeout = 1000;
+        }
+
+        if (lucf->log_level == NGX_CONF_UNSET_UINT) {
+            lucf->log_level = NGX_LOG_NOTICE;
+        }
     }
 
     return NGX_CONF_OK;
