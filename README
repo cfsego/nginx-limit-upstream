@@ -54,7 +54,7 @@ context: http
 
   Define a shared memory pool for the module.
 
-syntax:  limit_upstream_conn zone=zone_name limit=limit [backlog=length] [timeout=timeout | nodelay];
+syntax:  limit_upstream_conn zone=zone_name limit=limit [backlog=length] [timeout=timeout | nodelay] [instant_hook];
 default: -
 context: upstream
 
@@ -64,6 +64,10 @@ The default for 'backlog' is 1000, and the default for 'timeout' is 1000 ms.
 
   When backlog for a server is full, it may use other server, Otherwise,
 it wait in the queue. Timeout will cause 408 return status code.
+
+  Parameter 'instant_hook' shouild be used when you are with a dynamic upstream
+updating module, eg. ngx_dyn_ups_module. What about with Nginx Plus? I didn't test that.
+For more details, you can refer to https://github.com/cfsego/nginx-limit-upstream/issues/13
 
 syntax:  limit_upstream_log_level [ error | warn | notice | info ];
 default: limit_upstream_log_level notice;
@@ -123,6 +127,8 @@ former server is not decreased, then the whole system fails to work after a numb
 of such fails.
 
 =CHANGES===============================================================
+
+  1.2.2 [2016.7.13] now can work with ngx_dyn_ups_module.
 
   1.2.1 [2013.6.5] fixed a bug variable 'pc' is unused.
 
