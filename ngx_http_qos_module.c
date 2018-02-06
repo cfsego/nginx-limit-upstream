@@ -370,7 +370,7 @@ ngx_http_limit_upstream_cleanup(void *data)
         lnode->work++;
 
         ngx_http_upstream_connect(ctx->r, ctx->r->upstream);
-    } while (ngx_atomic_fetch_add(&snode->counter, 1)
+    } while ((ngx_uint_t) ngx_atomic_fetch_add(&snode->counter, 1)
              < ctx->lucf->limit_conn && lnode->qlen);
 
     snode->counter--;
@@ -547,7 +547,7 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
 
     if (active >= ctx->lucf->limit_conn && lnode->work) {
 #else
-    if (ngx_atomic_fetch_add(&snode->counter, 1) >= ctx->lucf->limit_conn
+    if ((ngx_uint_t) ngx_atomic_fetch_add(&snode->counter, 1) >= ctx->lucf->limit_conn
         && lnode->work)
     {
 #endif
