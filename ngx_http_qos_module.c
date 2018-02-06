@@ -197,6 +197,7 @@ ngx_http_limit_upstream_timeout(ngx_http_request_t *r)
     ngx_http_upstream_t             *u;
     ngx_http_limit_upstream_wait_t  *w;
     ngx_http_limit_upstream_loc_t   *l;
+    ngx_http_limit_upstream_ctx_t   *ctx;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "limit upstream: into timeout");
@@ -209,22 +210,24 @@ ngx_http_limit_upstream_timeout(ngx_http_request_t *r)
         return;
     }
 
-    ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+    u = r->upstream;
+
+    ctx = (ngx_http_limit_upstream_ctx_t *) u->peer.data;
+
+    ngx_log_error(ctx->lucf->log_level, r->connection->log, 0,
                   "limit upstream: request[%p] is timeout", r);
 
     wev->timedout = 0;
-
-    u = r->upstream;
 
     if (u->cleanup) {
         *u->cleanup = NULL;
         u->cleanup = NULL;
     }
 
-    w = ((ngx_http_limit_upstream_ctx_t *) u->peer.data)->wait;
+    w = ctx->wait;
     ngx_queue_remove(&w->queue);
 
-    l = ((ngx_http_limit_upstream_ctx_t *) u->peer.data)->lnode;
+    l = ctx->lnode;
     l->qlen--;
 
     ngx_http_finalize_request(r, NGX_HTTP_REQUEST_TIME_OUT);
@@ -398,6 +401,7 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
     ngx_rbtree_node_t               *node_s, *node_l;
     struct sockaddr_in              *sin;
     ngx_http_cleanup_t              *cln;
+    ngx_http_upstream_t             *u;
     ngx_http_limit_upstream_ctx_t   *ctx;
     ngx_http_limit_upstream_loc_t   *lnode;
     ngx_http_limit_upstream_shm_t   *snode;
@@ -488,6 +492,7 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
         ngx_queue_init(&lnode->wait);
 
         ngx_rbtree_insert(&ngx_http_limit_upstream_loc_rbtree, node_l);
+
     } else {
         cnode = (ngx_http_limit_upstream_node_t *) &node_l->color;
         lnode = (ngx_http_limit_upstream_loc_t *) &cnode->counter;
@@ -517,6 +522,7 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
         ngx_rbtree_insert(shmctx->rbtree, node_s);
 
         ngx_shmtx_unlock(&shpool->mutex);
+
     } else {
         cnode = (ngx_http_limit_upstream_node_t *) &node_s->color;
         snode = (ngx_http_limit_upstream_shm_t *) &cnode->counter;
@@ -549,7 +555,7 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
         snode->counter--;
 
         if (lnode->qlen >= ctx->lucf->backlog) {
-            ngx_log_error(NGX_LOG_WARN, ctx->r->connection->log, 0,
+            ngx_log_error(ctx->lucf->log_level, ctx->r->connection->log, 0,
                           "limit_upstream: request[%p] is dropped", ctx->r);
             return NGX_DECLINED;
         }
@@ -584,6 +590,7 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
 
             if (t > 0) {
                 ctx->r->connection->read->timer.key = t;
+
             } else {
                 ctx->r->connection->read->timedout = 1;
             }
@@ -604,7 +611,14 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
                 ctx->r->connection->write->timedout = 1;
             }
         }
-        ngx_add_timer(ctx->r->connection->write, ctx->lucf->timeout);
+
+        if (ctx->lucf->timeout == 0) {
+            u = ctx->r->upstream;
+            ngx_add_timer(ctx->r->connection->write, u->conf->read_timeout);
+
+        } else {
+            ngx_add_timer(ctx->r->connection->write, ctx->lucf->timeout);
+        }
 
         ctx->r->upstream->blocked = 1;
 
@@ -722,7 +736,7 @@ ngx_http_limit_upstream_init(ngx_conf_t *cf)
                 }
 
                 if (lucf->timeout == NGX_CONF_UNSET_MSEC) {
-                    lucf->timeout = 1000;
+                    lucf->timeout = 0;
                 }
 
                 if (ngx_http_limit_upstream_merge_srv_conf(cf, mlucf, lucf)
@@ -937,7 +951,7 @@ ngx_http_limit_upstream_conn(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
 
         if (lucf->timeout == NGX_CONF_UNSET_MSEC) {
-            lucf->timeout = 1000;
+            lucf->timeout = 0;
         }
 
         if (lucf->log_level == NGX_CONF_UNSET_UINT) {
