@@ -104,6 +104,10 @@ However, I did not test it on the other versions :)
 
 =BUGS==================================================================
 
+* bugfixed    2018.2.6
+  1. Some logs do not follow the directive 'limit_upstream_log_level', are always WARN.
+  2. There are some warnings in compilation.
+
 * bugfixed    2016.6.13
   The requests are choked when proxying https to backend. The cause is it transfers
   invalid data to set_session().
@@ -129,6 +133,11 @@ former server is not decreased, then the whole system fails to work after a numb
 of such fails.
 
 =CHANGES===============================================================
+
+  1.2.3 [2018.2.6] now the default value of 'timeout' is the same as the read timeout
+                   set by upstream module used. For example, when using fastcgi, it is
+                   the same as the value set by 'fastcgi_read_timeout' or the default
+                   value of 'fastcgi_read_timeout' when not set.
 
   1.2.2 [2016.7.13] now can work with ngx_dyn_ups_module.
 
