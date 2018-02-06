@@ -60,7 +60,10 @@ context: upstream
 
   Set the zone used, the maximum allowed for each server of the upstream,
 the backlog length, and the timeout for each suspended request.
-The default for 'backlog' is 1000, and the default for 'timeout' is 1000 ms.
+The default for 'backlog' is 1000. Moreover, the default for 'timeout' is
+the same as the reading timeout set by proxy. For example, when using fastcgi,
+it is the same as the value set by 'fastcgi_read_timeout' or the default
+value of 'fastcgi_read_timeout' when not set.
 
   When backlog for a server is full, it may use other server, Otherwise,
 it wait in the queue. Timeout will cause 408 return status code.
@@ -134,10 +137,8 @@ of such fails.
 
 =CHANGES===============================================================
 
-  1.2.3 [2018.2.6] now the default value of 'timeout' is the same as the read timeout
-                   set by upstream module used. For example, when using fastcgi, it is
-                   the same as the value set by 'fastcgi_read_timeout' or the default
-                   value of 'fastcgi_read_timeout' when not set.
+  1.2.3 [2018.2.6] change the default of 'timeout' to the same as the reading timeout
+                   set by proxy.
 
   1.2.2 [2016.7.13] now can work with ngx_dyn_ups_module.
 
