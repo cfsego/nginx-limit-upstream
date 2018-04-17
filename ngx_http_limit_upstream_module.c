@@ -1,8 +1,6 @@
 /*
- * Author: weiyue
+ * Author: cfsego
  */
-
-
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
@@ -329,6 +327,8 @@ ngx_http_limit_upstream_cleanup(void *data)
         ctx->r->read_event_handler = wnode->read_event_handler;
         ctx->r->write_event_handler = wnode->write_event_handler;
 
+        ngx_del_timer(ctx->r->connection->read);
+
         if (wnode->r_timer_set) {
             if (ctx->r->connection->read->timedout) {
                 ctx->r->read_event_handler(ctx->r);
@@ -457,7 +457,7 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
 
     ctx->sockaddr = ngx_palloc(ctx->r->pool, pc->socklen);
     if (ctx->sockaddr == NULL) {
-        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        return NGX_ERROR;
     }
 
     ngx_memcpy(ctx->sockaddr, pc->sockaddr, pc->socklen);
@@ -547,8 +547,8 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
 
     if (active >= ctx->lucf->limit_conn && lnode->work) {
 #else
-    if ((ngx_uint_t) ngx_atomic_fetch_add(&snode->counter, 1) >= ctx->lucf->limit_conn
-        && lnode->work)
+    if ((ngx_uint_t) ngx_atomic_fetch_add(&snode->counter, 1)
+        >= ctx->lucf->limit_conn && lnode->work)
     {
 #endif
 
@@ -556,7 +556,7 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
 
         if (lnode->qlen >= ctx->lucf->backlog) {
             ngx_log_error(ctx->lucf->log_level, ctx->r->connection->log, 0,
-                          "limit_upstream: request[%p] is dropped", ctx->r);
+                          "limit upstream: request[%p] is dropped", ctx->r);
             return NGX_DECLINED;
         }
 
@@ -629,7 +629,7 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
 
     if (active >= ctx->lucf->limit_conn) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, ctx->r->connection->log, 0,
-                       "force continue request");
+                       "limit upstream: force continue request");
     }
 
 #endif
@@ -642,7 +642,7 @@ set_and_ret:
     if (!ctx->cln) {
         cln = ngx_http_cleanup_add(ctx->r, 0);
         if (cln == NULL) {
-            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+            return NGX_ERROR;
         }
 
         cln->handler = ngx_http_limit_upstream_cleanup;
@@ -1127,7 +1127,7 @@ ngx_http_limit_upstream_set_peer_session(ngx_peer_connection_t *pc, void *data)
     ngx_http_limit_upstream_ctx_t   *ctx;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, pc->log, 0,
-                   "limit upstream: set session");
+                   "limit upstream: set ssl session");
 
     ctx = (ngx_http_limit_upstream_ctx_t *) data;
 
