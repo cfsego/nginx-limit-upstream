@@ -60,7 +60,10 @@ context: upstream
 
   Set the zone used, the maximum allowed for each server of the upstream,
 the backlog length, and the timeout for each suspended request.
-The default for 'backlog' is 1000, and the default for 'timeout' is 1000 ms.
+The default for 'backlog' is 1000. Moreover, the default for 'timeout' is
+the same as the reading timeout set by proxy. For example, when using fastcgi,
+it is the same as the value set by 'fastcgi_read_timeout' or the default
+value of 'fastcgi_read_timeout' when not set.
 
   When backlog for a server is full, it may use other server, Otherwise,
 it wait in the queue. Timeout will cause 408 return status code.
@@ -73,8 +76,7 @@ syntax:  limit_upstream_log_level [ error | warn | notice | info ];
 default: limit_upstream_log_level notice;
 context: http, upstream
 
-  Define the log level of ordinary logs for the module.
-However it is absolutely "WARN" for timeout or discard.
+  Define the log level of logs for the module.
 
 =INSTALL===============================================================
 
@@ -104,6 +106,10 @@ However, I did not test it on the other versions :)
 
 =BUGS==================================================================
 
+* bugfixed    2018.2.6
+  1. Some logs do not follow the directive 'limit_upstream_log_level', are always WARN.
+  2. There are some warnings in compilation.
+
 * bugfixed    2016.6.13
   The requests are choked when proxying https to backend. The cause is it transfers
   invalid data to set_session().
@@ -129,6 +135,9 @@ former server is not decreased, then the whole system fails to work after a numb
 of such fails.
 
 =CHANGES===============================================================
+
+  1.2.3 [2018.2.6] change the default of 'timeout' to the same as the reading timeout
+                   set by proxy.
 
   1.2.2 [2016.7.13] now can work with ngx_dyn_ups_module.
 
