@@ -30,6 +30,22 @@ established connections to a upstream server is ('limit' + 'worker_processes').
 
 Example:
 
+stream {
+    server {
+        proxy_pass spool;
+    }
+
+    limit_upstream_zone stest 10m;
+
+    upstream spool {
+        server 10.232.36.98:3112;
+        ...
+
+        limit_upstream_conn limit=260 zone=stest backlog=10000 timeout=180s;
+        limit_upstream_log_level error;
+    }
+}
+
 http {
     server {
         location           =/test {
@@ -50,7 +66,7 @@ http {
 
 syntax:  limit_upstream_zone zone_name size;
 default: -
-context: http
+context: http, stream
 
   Define a shared memory pool for the module.
 
@@ -74,23 +90,26 @@ For more details, you can refer to https://github.com/cfsego/nginx-limit-upstrea
 
 syntax:  limit_upstream_log_level [ error | warn | notice | info ];
 default: limit_upstream_log_level notice;
-context: http, upstream
+context: http, stream, upstream
 
-  Define the log level of logs for the module.
+  Define the log level of ordinary logs for the module.
 
 =INSTALL===============================================================
 
 patch -p2 < nginx.patch (nginx 1.0.X, 1.2.X)
 or
-patch -p1 < nginx.1.4.4.patch (nginx 1.4.X, nginx 1.6.X)
+patch -p1 < nginx-1.4.4.patch (nginx 1.4.X, nginx 1.6.X)
 or
-patch -p0 < nginx.1.8.1.patch  (nginx 1.8.X, nginx 1.9.X)
+patch -p0 < nginx-1.8.1.patch  (nginx 1.8.X, nginx 1.9.X)
 or
-patch -p0 < nginx.1.10.1.patch  (nginx 1.10.X)
+patch -p0 < nginx-1.10.1.patch  (nginx 1.10.X)
 or
 cp /path/to/module/nginx.1.10.1.patch /path/to/nginx-1.10.0/debian/patches (nginx 1.10 on debian)
 or
-patch -p0 < nginx.1.12.1.patch  (nginx 1.12.X)
+patch -p0 < nginx-1.12.1.patch  (nginx 1.12.X)
+
+if you want to use the module for stream, use this patch in addition:
+patch -p1 < nginx-1.12.1-stream.patch
 
 ./configure --add-module=/path/to/module
 make
@@ -136,6 +155,8 @@ of such fails.
 
 =CHANGES===============================================================
 
+  1.3.0 [2018.4.17] now we can use this module with stream.
+
   1.2.3 [2018.2.6] change the default of 'timeout' to the same as the reading timeout
                    set by proxy.
 
@@ -148,6 +169,13 @@ of such fails.
   1.1.0 [2012.7.17] bugfixed, and optimize for efficiency, 10% faster.
 
   1.0.0 [2012.5.31] initial version, including some bug fixes.
+
+=USED WITH STREAM======================================================
+
+  On timeout, nginx will close the connection immediately, so the client may receive
+TCP datagram with RST flag. When the module drops a session, it returns NGX_DECLINED, so
+nginx will try another peer and mark current peer as failed, this may take effects on
+load balancer. If this cause any problem, let me know.
 
 =USED WITH UPSTREAM KEEPALIVE==========================================
 
