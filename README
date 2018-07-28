@@ -106,7 +106,7 @@ patch -p0 < nginx-1.10.1.patch  (nginx 1.10.X)
 or
 cp /path/to/module/nginx.1.10.1.patch /path/to/nginx-1.10.0/debian/patches (nginx 1.10 on debian)
 or
-patch -p0 < nginx-1.12.1.patch  (nginx 1.12.X)
+patch -p1 < nginx-1.12.1.patch  (nginx 1.12.X)
 
 if you want to use the module for stream, use this patch in addition:
 patch -p1 < nginx-1.12.1-stream.patch
